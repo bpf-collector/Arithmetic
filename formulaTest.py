@@ -78,17 +78,21 @@ def replaceFractionTest(gf):
 def gf_solveTest(gf):
     s = gf.solve()
 # 1e6
-# oper_num = 5  0:02:19.699525; 0:02:12.607364; 0:02:07.970957;
+# version 1.0 oper_num = 5  0:00:48.304376; 0:00:49.523814; 0:00:45.649577;
+# version 2.0 oper_num = 5  0:00:40.939863; 0:00:37.203209; 0:00:38.834361;
 
-def cf_solveTest(cf):
-    s = cf.solve()
+def cf_solveTest(cf, formular):
+    s = cf.solve(formular)
 # 1e6
-# oper_num = 5  0:02:23.049934; 
+# version 1.0 oper_num = 5  0:01:23.161481; 0:01:26.414998; 0:01:25.195089;
+# version 2.0 oper_num = 5  0:01:20.533413; 0:01:20.834751; 0:01:21.405273;
 
 if __name__ == "__main__":
-    opt = OPT(oper_num=5)
+    opt = OPT(oper_num=5, has_fraction=True)
     gf = GeneralFormular(opt)
     cf = ComputeFormular()
+
+    formulars = []
     
     start = datetime.datetime.now()
     for i in range(int(1e6)):
@@ -99,8 +103,15 @@ if __name__ == "__main__":
         # getOriginFormularTest(gf)
         # insertBracketTest(gf)
         # replaceFractionTest(gf)
-        gf_solveTest(gf)
-        # cf_solveTest(cf)
+        # gf_solveTest(gf)
+        # formulars.append(gf.solve())
+        cf_solveTest(cf, gf.solve())
         pass
+
+    print("Time: {}".format(datetime.datetime.now() - start))
+
+    start = datetime.datetime.now()
+    for i in formulars:
+        cf_solveTest(cf, i)
 
     print("Time: {}".format(datetime.datetime.now() - start))

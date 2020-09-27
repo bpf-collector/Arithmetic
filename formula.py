@@ -2,7 +2,7 @@
 '''
  * @Author       : bpf
  * @Date         : 2020-09-19 15:57:48
- * @version      : 1.0
+ * @version      : 2.0
  * @Description  : 实现四则运算
  * @LastEditTime : 2020-09-24 00:31:56
 '''
@@ -13,7 +13,7 @@ import argparse
 import re
 from fractions import Fraction
 
-def OPT(up_limit=10, oper_num=2, oper_variety=4, has_fraction=True):
+def OPT(up_limit=10, oper_num=2, oper_variety=4, has_fraction=True, be_negetive=False):
     '''
      * 设置参数
 
@@ -24,6 +24,8 @@ def OPT(up_limit=10, oper_num=2, oper_variety=4, has_fraction=True):
      * @param oper_variety {int} 运算符种类
 
      * @param has_fraction {bool} 是否带有分数
+
+     * @param be_negative {bool} 可否存在负数
     '''
     parse = argparse.ArgumentParser()
     # 操作数数值上限
@@ -34,6 +36,8 @@ def OPT(up_limit=10, oper_num=2, oper_variety=4, has_fraction=True):
     parse.add_argument('--oper_variety', type=int, default=oper_variety)
     # 是否带有分数
     parse.add_argument('--has_fraction', type=bool, default=has_fraction)
+    # 可否存在负数
+    parse.add_argument('--be_negative', type=bool, default=be_negetive)
 
     return parse.parse_args(args=[])
 
@@ -45,6 +49,8 @@ class GeneralFormular:
     '''
     def __init__(self, opt):
         self.opt = opt
+        # 定义运算符
+        self.operator = ['+', '-', '×', '÷']
 
     # @profile
     def catFormula(self, operand1, operator, operand2):
@@ -60,7 +66,7 @@ class GeneralFormular:
         * @return {str}
         '''
 
-        return "{}{}{}".format(operand1, operator, operand2)
+        return "{}#{}#{}".format(operand1, operator, operand2)
 
     # @profile
     def getRandomIntOperand(self):
@@ -86,11 +92,11 @@ class GeneralFormular:
         while num01 == 0:
             num01 = self.getRandomIntOperand()
 
-        # 保证分数为真分数
+        # 保证分数为真分数, 化简
         if num01 < num02:
-            return str(num01) + "/" + str(num02)
+            return Fraction(num01, num02).__str__()
         else:
-            return str(num02) + "/" + str(num01)
+            return Fraction(num02, num01).__str__()
 
     # @profile
     def getRandomOperator(self):
@@ -100,125 +106,119 @@ class GeneralFormular:
         * @return {str}
         '''
         index = random.randint(0, self.opt.oper_variety-1)
-        if index == 0:
-            return '+'
-        elif index == 1:
-            return '-'
-        elif index == 2:
-            return '×'
-        else:
-            return '÷'
+        return self.operator[index]
 
     # @profile
     def getOriginFormular(self):
         '''
         * 生成整数源算式
 
-        * @return {str} 
+        * @return {list} 
         '''
         # 通过self.opt.oper_num控制操作数个数，循环调用catFormula()方法构造算式
-        tmp = self.getRandomIntOperand()
+        formular = self.getRandomIntOperand()
         for i in range(self.opt.oper_num-1):
-            tmp = self.catFormula(tmp, self.getRandomOperator(), self.getRandomIntOperand())
+            formular = self.catFormula(formular, self.getRandomOperator(), self.getRandomIntOperand())
 
         # 去掉'÷0'
         while(True):
-            if '÷0' in tmp:
-                tmp = tmp.replace('÷0', '÷'+str(self.getRandomIntOperand()))
+            if '÷#0' in formular:
+                formular = formular.replace('÷#0', '÷#' + str(self.getRandomIntOperand()))
             else:
                 break
+        # 通过'#'分割生成列表
+        formular_list = formular.split('#')
 
-        return tmp
+        return formular_list
 
     # @profile
-    def insertBracket(self, formular):
+    def insertBracket(self, formular_list):
         '''
          * 插入括号
 
-         * @param formular {str} 源算式
+         * @param formular_list {list} 源算式列表
 
-         * @return {str} 
+         * @return {list} 
         '''
         # print(formular)
 
         # 若只包含+号 或 只有两个操作数 则不用加括号
         if self.opt.oper_variety <= 2 or self.opt.oper_num == 2:
-            return formular
+            return formular_list
         # 若不包含×÷ 则不用加括号
-        if '×' not in formular and '÷' not in formular:
-            return formular
-        
-        # 操作数列表
-        operand_list = re.split("[-|+|×|÷]", formular)
-        # 操作符列表
-        operator_list = re.split("[!0-9]", formular)
-        # 去掉空字符
-        while '' in operator_list:
-            operator_list.remove('')
-        # print(operand_list, operator_list)
+        if '×' not in formular_list and '÷' not in formular_list:
+            return formular_list
 
         # 存储添加括号的算式
-        new_formular = ""
+        new_formular_list = []
         
         # flag表示是否已存在左括号，作用在于构造出一对括号
         flag = 0
 
         # 添加括号
-        for i in range(len(operator_list)):
-            oper = operator_list.pop(0)
+        while(len(formular_list) > 1):
+            oper = formular_list.pop(1)
             # 若下一个符号为 + or - , 则插入括号
             if oper == '-' or oper == '+':
                 if flag == 0:
-                    new_formular += "("
+                    new_formular_list.append("(")
                     flag = 1
-                new_formular += (str(operand_list.pop(0)) + str(oper))
+                new_formular_list.append(formular_list.pop(0))
+                new_formular_list.append(oper)
             else:
-                new_formular += str(operand_list.pop(0))
+                new_formular_list.append(formular_list.pop(0))
 
                 if flag == 1:
-                    new_formular += ")"
+                    new_formular_list.append(")")
                     flag = 0
                 
-                new_formular += str(oper)
+                new_formular_list.append(oper)
             # print(operand_list, operator_list, new_formular)
         
-        new_formular += str(operand_list.pop(0))
+        new_formular_list.append(formular_list.pop(0))
         if flag == 1:
-            new_formular += ")"
+            new_formular_list.append(")")
         
-        return new_formular
+        return new_formular_list
     
     # @profile
-    def replaceFraction(self, formular):
+    def replaceFraction(self, formular_list):
         '''
          * 带入分数
 
-         * @param formular {str} 源算式，可能包含括号
+         * @param formular_list {list} 源算式列表，可能包含括号
 
-         * @return {str} 
+         * @return {list} 
         '''
 
         # 带入分数个数
         fraction_num = 1
         if self.opt.oper_num > 2:
             fraction_num = (self.opt.oper_num - 1) / 2
-        # 操作数列表
-        operand_list = re.split("[-|+|×|÷|(|)]", formular)
-        # 去掉空字符
-        while '' in operand_list:
-            operand_list.remove('')
-        index = random.randint(0, len(operand_list)-1)
+        index = random.randint(0, len(formular_list)-1)
 
-        formular = formular.replace(str(operand_list[index]), self.getRandomFractionOperand())
+        interval = 1
+        while True:
+            if formular_list[index].isdigit():
+                break
+            elif formular_list[index - interval].isdigit():
+                index -= interval
+                break
+            elif formular_list[index + interval].isdigit():
+                index += interval
+                break
+            else:
+                interval += 1
+        formular_list[index] = self.getRandomFractionOperand()
 
-        return formular
+        return formular_list
 
     # @profile
     def solve(self):
         '''
          * 整合生成算式的后缀表达式，带括号
 
-         * @return {str} 
+         * @return {list} 
         '''
         # 生成原生算式
         ori_formular = self.getOriginFormular()
@@ -238,142 +238,94 @@ class ComputeFormular:
         pass
     
     # @profile
-    def getPostFormular(self, formular):
+    def getPostFormular(self, formular_list):
         '''
         * 中缀表达式转为后缀表达式
 
-        * @param formular {str} 中缀表达式
+        * @param formular_list {list} 中缀表达式
         
-        * @return {str} 
+        * @return {list} 
         '''
+        # 运算符优先级
+        priority = {'×': 3, '÷': 3, '+': 2, '-': 2, '(': 1}
+
         # 运算符栈
         operator_stack = []
         
         # 后缀表达式
-        post_formular = ""
+        post_formular_list = []
 
         # 中缀表达式转为后缀表达式
-        i = 0
-        while i < len(formular):
-            char = formular[i]
-            # print("1: ", i, char, operator_stack, post_formular)
+        while formular_list:
+            char = formular_list.pop(0)
             if char == '(':
                 operator_stack.append(char)
-                i += 1
-                # print("2: ", i, operator_stack, post_formular)
             elif char == ')':
-                tmp_char = operator_stack.pop()
-                while tmp_char != '(':
-                    post_formular += tmp_char
-                    if len(operator_stack) != 0:
-                        tmp_char = operator_stack.pop()
-                    else:
-                        break
-                i += 1
-                # print("3: ", i, operator_stack, post_formular)
-            elif char == '+' or char == '-':
-                try:
-                    tmp_char = operator_stack.pop()
-                except Exception as e:
-                    pass
-                while len(operator_stack) != 0:
-                    if tmp_char != '(':
-                        post_formular += tmp_char
-                        if len(operator_stack) != 0:
-                            tmp_char = operator_stack.pop()
-                        else:
-                            break
-                    else:
-                        operator_stack.append(tmp_char)
-                        break
+                oper_char = operator_stack.pop()
+                while oper_char != '(':
+                    post_formular_list.append(oper_char)
+                    oper_char = operator_stack.pop()
+            elif char in '+-×÷':
+                while operator_stack and priority[operator_stack[-1]] >= priority[char]:
+                    post_formular_list.append(operator_stack.pop())
                 operator_stack.append(char)
-                i += 1
-                # print("4: ", i, operator_stack, post_formular)
-            elif char == '×' or char == '÷':
-                while len(operator_stack) != 0:
-                    tmp_char = operator_stack.pop()
-                    if tmp_char== '×' or tmp_char == '÷':
-                        post_formular += tmp_char
-                        if len(operator_stack) != 0:
-                            tmp_char = operator_stack.pop()
-                        else:
-                            break
-                    else:
-                        break
-                operator_stack.append(char)
-                i += 1
-                # print("5: ", i, operator_stack, post_formular)
-            # 存在数字时
             else:
-                # print("6: ", i, operator_stack, post_formular)
-                while char >= '0' and char <= '9' or char == '/':
-                    post_formular += char
-                    i += 1
-                    if i < len(formular):
-                        char = formular[i]
-                    else:
-                        break
-                post_formular += '#'
-                # print("7: ", i, operator_stack, post_formular)
+                post_formular_list.append(char)
 
         # 若符号栈不为空则循环
-        while len(operator_stack) != 0:
-            tmp_char = operator_stack.pop(0)
-            post_formular += tmp_char
-            # print("8: ", i, operator_stack, tmp_char)
+        while operator_stack:
+            post_formular_list.append(operator_stack.pop())
         
         # print(post_formular)
-        return post_formular
-    
+        return post_formular_list
+        
     # @profile
-    def calcFormular(self, formular):
+    def compute(self, char, num01, num02):
+        '''
+        * 计算算式的值
+
+        * @param char {str} 运算符
+        
+        * @param num01 {str} 第二个数字，可能为分数
+
+        * @param num02 {str} 第二个数字，可能为分数
+        
+        * @return {str}
+        '''
+        if char == '+':
+            return (Fraction(num02) + Fraction(num01)).__str__()
+        elif char == '-':
+            return (Fraction(num02) - Fraction(num01)).__str__()
+        elif char == '×':
+            return (Fraction(num02) * Fraction(num01)).__str__()
+        elif char == '÷':
+            try:
+                return (Fraction(num02) / Fraction(num01)).__str__()
+            except Exception as e:
+                # print("Error: ", e)
+                return "NaN"
+
+    # @profile
+    def calcFormular(self, post_formular_list):
         '''
          * 计算算式的值
 
-         * @param formular {str} 后缀表达式
+         * @param post_formular_list {list} 后缀表达式
 
          * @return {str} 
         '''
         # 操作数栈
         operand_stack = []
-        i = 0
-        while i < len(formular):
-            if formular[i] == '+':
-                num01 = operand_stack.pop()
-                num02 = operand_stack.pop()
-                result = Fraction(num02) + Fraction(num01)
-                operand_stack.append(result.__str__())
-            elif formular[i] == '-':
-                num01 = operand_stack.pop()
-                num02 = operand_stack.pop()
-                result = Fraction(num02) - Fraction(num01)
-                operand_stack.append(result.__str__())
-            elif formular[i] =='×':
-                num01 = operand_stack.pop()
-                num02 = operand_stack.pop()
-                result = Fraction(num02) * Fraction(num01)
-                operand_stack.append(result.__str__())
-            elif formular[i] == '÷':
-                num01 = operand_stack.pop()
-                num02 = operand_stack.pop()
-                try:
-                    result = Fraction(num02) / Fraction(num01)
-                    operand_stack.append(result.__str__())
-                except Exception as e:
-                    # print('Error: 除零错误！')
-                    return "NaN"
+
+        while post_formular_list:
+            char = post_formular_list.pop(0)
+            if char in '+-×÷':
+                result = self.compute(char, operand_stack.pop(), operand_stack.pop())
+                if result == "NaN":
+                    return result
+                operand_stack.append(result)
             else:
-                number = ""
-                while formular[i] >= '0' and formular[i] <= '9' or formular[i] == '/':
-                    number += formular[i]
-                    if i < len(formular):
-                        i += 1
-                    else:
-                        i -= 1
-                        break
-                operand_stack.append(number)
-            
-            i += 1
+                operand_stack.append(char)
 
         return operand_stack.pop()
     
@@ -382,7 +334,7 @@ class ComputeFormular:
         '''
          * 整合计算中缀表达式的值
 
-         * @param formular {str} 后缀表达式
+         * @param formular {list} 后缀表达式
 
          * @return {str} 
         '''
@@ -414,6 +366,6 @@ if __name__ == "__main__":
     # print("结果：", value)
 
     fra_formular = gf.solve()
-    print("中缀式：", fra_formular)
+    print(" ".join(i for i in fra_formular), end=" = ")
     value = cf.solve(fra_formular)
-    print("结果：", value)
+    print(value)

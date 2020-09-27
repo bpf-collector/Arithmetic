@@ -1,2 +1,5 @@
 *.doc
 *.docx
+.vscode
+*.lprof
+__pycache__
